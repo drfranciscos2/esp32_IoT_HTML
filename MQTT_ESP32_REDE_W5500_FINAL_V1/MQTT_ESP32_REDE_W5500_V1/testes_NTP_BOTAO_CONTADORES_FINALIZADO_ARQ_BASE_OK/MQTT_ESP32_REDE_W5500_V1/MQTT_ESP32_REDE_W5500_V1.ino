@@ -1,0 +1,243 @@
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+#include <Ethernet.h>
+#include <Bounce2.h>
+#include <EthernetUdp.h>
+#include <NTPClient.h>
+#include <TimeLib.h>
+#include "pinConfig.h"
+#include "HoraDataNTP.h"
+#include "Sensores.h"
+
+#define ETH_SPI_SCS 5  // CS (Chip Select),
+
+
+
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+IPAddress ip(192, 168, 1, 177);
+IPAddress gateway(192, 168, 1, 254); 
+IPAddress subnet(255, 255, 255, 0);
+IPAddress dns(8, 8, 8, 8);
+
+//const char* ssid = "Francisco";
+//const char* password = "fransousa";
+
+
+const char* mqtt_server = "192.168.1.13";  // servidor MQTT
+const int mqtt_port = 1883;
+const char* mqtt_user = "";  // usuario mqtt
+const char* mqtt_pass = "";  // senha mqtt
+
+
+const char* device_id = "Placa_01";  // Id da placa
+
+// Topicos
+const char* topic_telemetry = "esp32/mqtt/dados_json";  // dados Json a cada 5 segundos
+const char* topic_command = "esp32/mqtt/cmd";           // comando ON ou OFF
+const char* topic_status = "esp32/mqtt/status";         // status de conexão da placa
+
+
+EthernetClient espClient;
+PubSubClient client(espClient);
+
+EthernetUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "a.st1.ntp.br", 0);
+
+// Timers for non-blocking delays
+unsigned long lastMsgTime = 0;
+const long interval = 1000;  // envia a cada 1 segundo
+
+
+
+
+
+void checa_rede() {
+  Serial.println("Checando hardware...");
+  if (Ethernet.hardwareStatus() == EthernetNoHardware) {
+    Serial.println("ERRO: Defeito na W5500 ou ausente!");
+    return;
+  } else {
+    Serial.println("Ethernet detectada!");
+  }
+
+  //Check if cable is connected
+  if (Ethernet.linkStatus() == LinkOFF) {
+    Serial.println("Cabo desconectado.");
+  } else {
+    Serial.println("Cabo conectado!");
+    Serial.print("conectado ao IP : ");
+    Serial.println(ip);
+  }
+}
+void setup_wifi() {
+  delay(10);
+  Serial.println();
+  Serial.print("Conectando ao Wifi: ");
+  //Serial.println(ssid);
+
+  WiFi.mode(WIFI_STA);
+  // WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.println("WiFi conectado");
+  Serial.print("Endereço IP: ");
+  Serial.println(WiFi.localIP());
+}
+
+
+void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("Mensagem recebida [");
+  Serial.print(topic);
+  Serial.print("] ");
+
+
+  String message;
+  for (int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+  Serial.println(message);
+
+  // comandos publicados
+  //  se recebe "ON", liga o LED, caso receba OFF o led apaga
+  if (String(topic) == topic_command) {
+    if (message == "ON") {
+      digitalWrite(SAIDA_LED, HIGH);
+      // Feedback da publicação
+      client.publish(topic_telemetry, "{\"led\": \"ON\"}");
+    } else if (message == "OFF") {
+      digitalWrite(SAIDA_LED, LOW);
+      client.publish(topic_telemetry, "{\"led\": \"OFF\"}");
+    }
+  }
+}
+
+// reconecta
+void reconnect() {
+
+  while (!client.connected()) {
+    Serial.print("Attempting MQTT connection...");
+
+
+
+    if (client.connect(device_id, mqtt_user, mqtt_pass, topic_status, 1, true, "offline")) {
+      Serial.println("Conectado");
+
+
+      client.publish(topic_status, "online", true);
+
+
+      client.subscribe(topic_command);
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" Tentando novamente em 5s");
+     static unsigned long ultimaTentativa = 0;
+if (millis() - ultimaTentativa > 5000) {
+    ultimaTentativa = millis();
+    // tenta conectar...
+}
+    }
+  }
+}
+
+//int estadoBotao;
+Gerenciador meuGerenciador;
+
+void publicarDados(const char* evento) {
+  struct tm timeinfo;
+  
+  // Tenta ler o relógio interno (RTC) do ESP32
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Erro: RTC não sincronizado. Tentando forçar NTP...");
+    timeClient.update();
+    time_t t = timeClient.getEpochTime();
+    struct timeval tv = { .tv_sec = t };
+    settimeofday(&tv, NULL);
+    if(!getLocalTime(&timeinfo)) return; // Aborta se ainda estiver sem hora
+  }
+
+  char dataHora[25];
+  // strftime formata data/hora com segurança e sem erros de cálculo manual
+  strftime(dataHora, sizeof(dataHora), "%d/%m/%Y %H:%M:%S", &timeinfo);
+
+  JsonDocument doc;
+  doc["Evento"] = evento;
+  doc["Data_Hora"] = dataHora;
+  doc["Placa"] = device_id;
+  doc["botao_25"] = estadoBotao;
+  doc["temp"] = random(20, 30);
+  doc["Cont_A"] = cont_producao_A;
+  doc["Cont_B"] = cont_producao_B;
+  doc["Cont_C"] = cont_producao_C;
+  char buffer[512];
+  serializeJson(doc, buffer);
+
+  if (client.connected()) {
+    client.publish(topic_telemetry, buffer);
+    Serial.print("Publicado: ");
+    Serial.println(buffer);
+  }
+}
+void setup() {
+  Serial.begin(115200);
+  configurarPinos(); // Inicializa hardware
+  
+  inicializarSensores(); // Carrega contagens da Flash
+
+  Ethernet.init(ETH_SPI_SCS);
+  Ethernet.begin(mac, ip, dns, gateway, subnet);
+  
+  client.setServer(mqtt_server, mqtt_port);
+  //client.setCallback(callback);
+  client.setBufferSize(512); //  Aumentar buffer para o JSON caber
+  
+   
+  
+  
+  timeClient.begin();
+  // Força sincronia inicial
+  while(!timeClient.update()){
+    timeClient.forceUpdate();
+    delay(500);
+    Serial.print(".");
+  }
+
+  // 1. Injeta o tempo UTC (puro da rede) no chip
+  time_t t = timeClient.getEpochTime();
+  struct timeval tv = { .tv_sec = t, .tv_usec = 0 };
+  settimeofday(&tv, NULL);
+
+  // 2. Define que o fuso local do sistema é -3 horas (Brasília)
+  // Agora o getLocalTime() pegará o UTC e subtrairá 3 apenas uma vez.
+  setenv("TZ", "<-03>3", 1);
+  tzset();
+
+  delay(1000);
+  checa_rede();
+}
+
+void loop() {
+  if (!client.connected()) reconnect();
+  client.loop();
+  //atualizarPinos(); // Atualiza Bounce2
+                   
+  processarSensores(); // Gerencia Botão 25 e Contador 26
+
+   // Executa a rotina de piscar o LED D4 baseada na mudança de estadoBotao
+  gerenciarPiscaSemDelay(estadoBotao);
+
+  
+  //  ENVIO PERIÓDICO (CADA 5 SEGUNDOS) ---
+  unsigned long now = millis();
+  if (now - lastMsgTime > interval) {
+    lastMsgTime = now;
+    publicarDados("PERIODICO");
+  }
+}
+  

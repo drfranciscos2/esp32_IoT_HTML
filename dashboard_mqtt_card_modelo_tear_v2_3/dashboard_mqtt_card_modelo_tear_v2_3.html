@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoramento de Produção - MQTT</title>
+    <script src="mqtt.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #f4f6f9;
+            --text: #0f2a4a;
+            --muted: #6b7280;
+            --line: #e5e7eb;
+            --card: #ffffff;
+            --header-prod: #4fcb7a;
+            --header-stop: #f87171;
+            --header-amostra: #facc15;
+            --header-manut: #38bdf8;
+            --header-off: #94a3b8;
+            --green: #31c46b;
+            --red: #ef4444;
+            --yellow: #f59e0b;
+            --blue: #2563eb;
+            --dark: #123057;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .app {
+            display: grid;
+            grid-template-columns: 270px 1fr;
+            min-height: 100vh;
+        }
+
+        #sidebar {
+            background: #0f172a;
+            color: #fff;
+            padding: 22px 18px;
+        }
+
+        #sidebar h2 {
+            margin: 0 0 18px;
+            font-size: 20px;
+        }
+
+        .side-card {
+            background: rgba(255,255,255,.08);
+            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 16px;
+            padding: 14px;
+            margin-bottom: 14px;
+        }
+
+        .side-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: #cbd5e1;
+            margin-bottom: 10px;
+        }
+
+        .chk-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 10px 0;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .chk-item input {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--yellow);
+        }
+
+        #status {
+            display: inline-flex;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(239,68,68,.15);
+            color: #fecaca;
+            font-weight: 700;
+            font-size: 13px;
+        }
+
+        #status.connected {
+            background: rgba(34,197,94,.15);
+            color: #bbf7d0;
+        }
+
+        #main-content { padding: 26px; }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 22px;
+            flex-wrap: wrap;
+        }
+
+        h1 {
+            margin: 0;
+            color: var(--dark);
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            margin-top: 6px;
+            font-size: 14px;
+        }
+
+        .summary {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .summary-item {
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 10px 14px;
+            min-width: 105px;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, .06);
+        }
+
+        .summary-label { color: var(--muted); font-size: 12px; }
+        .summary-value { font-size: 22px; font-weight: 800; margin-top: 2px; }
+
+        #dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(310px, 340px));
+            gap: 22px;
+            align-items: start;
+        }
+
+        .empty-state {
+            background: #fff;
+            border: 1px dashed #cbd5e1;
+            border-radius: 18px;
+            padding: 28px;
+            color: var(--muted);
+            text-align: center;
+            grid-column: 1 / -1;
+        }
+
+        .machine-card {
+            background: var(--card);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, .14);
+            border: 1px solid #e9edf3;
+            color: var(--dark);
+            min-height: 435px;
+            transition: transform .18s ease, box-shadow .18s ease;
+        }
+
+        .machine-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 16px 32px rgba(15, 23, 42, .18);
+        }
+
+        .machine-card.pulse {
+            animation: pulseUpdate .45s ease;
+        }
+
+        @keyframes pulseUpdate {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.01); }
+            100% { transform: scale(1); }
+        }
+
+        .card-top {
+            display: grid;
+            grid-template-columns: 70px 1fr;
+            align-items: center;
+            min-height: 64px;
+            background: var(--header-stop);
+            color: #fff;
+        }
+
+        .machine-card.producao .card-top { background: var(--header-prod); }
+        .machine-card.parada .card-top { background: var(--header-stop); }
+        .machine-card.amostra .card-top { background: var(--header-amostra); color: #7c4a03; }
+        .machine-card.manutencao .card-top { background: var(--header-manut); color: #07324a; }
+        .machine-card.offline .card-top { background: var(--header-off); color: #fff; }
+
+        .machine-icon-wrap {
+            height: 64px;
+            background: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--dark);
+            font-size: 30px;
+        }
+
+        .machine-title {
+            font-size: 20px;
+            font-weight: 800;
+            line-height: 1.1;
+        }
+
+        .machine-time {
+            margin-top: 5px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            opacity: .95;
+        }
+
+        .info-list {
+            padding: 14px 20px 8px;
+        }
+
+        .info-row {
+            display: grid;
+            grid-template-columns: 28px 1fr auto;
+            align-items: center;
+            gap: 8px;
+            min-height: 38px;
+            font-size: 14px;
+        }
+
+        .row-icon {
+            color: #23466f;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .row-label { color: #111827; }
+        .row-value { color: #0f2a4a; font-weight: 600; }
+
+        .led {
+            width: 12px;
+            height: 12px;
+            display: inline-block;
+            border-radius: 50%;
+            margin-left: 8px;
+            border: 2px solid #fff;
+            box-shadow: 0 0 0 1px rgba(0,0,0,.10);
+            vertical-align: middle;
+        }
+
+        .led.green { background: var(--green); }
+        .led.red { background: var(--red); }
+        .led.yellow { background: var(--yellow); }
+        .led.blue { background: var(--blue); }
+        .led.gray { background: #cbd5e1; }
+
+        .time-strip {
+            border-top: 1px solid var(--line);
+            border-bottom: 1px solid var(--line);
+            background: #fafafa;
+            min-height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 22px;
+            font-size: 12px;
+        }
+
+        .time-good { color: var(--green); font-weight: 700; }
+        .time-bad { color: var(--red); font-weight: 700; }
+
+        .main-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            min-height: 126px;
+            align-items: center;
+            padding: 18px 18px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .gauge-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .gauge {
+            width: 112px;
+            height: 56px;
+            border-radius: 112px 112px 0 0;
+            background: conic-gradient(from 270deg, #aeb0b4 0deg, #aeb0b4 180deg, transparent 180deg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .gauge::after {
+            content: "";
+            position: absolute;
+            left: 13px;
+            top: 13px;
+            width: 86px;
+            height: 86px;
+            background: #fff;
+            border-radius: 50%;
+        }
+
+        .gauge-text {
+            margin-top: -30px;
+            text-align: center;
+            z-index: 2;
+            position: relative;
+            font-size: 14px;
+            color: #0f172a;
+        }
+
+        .metric-right { text-align: center; }
+        .metric-label { color: #1e3a8a; font-size: 14px; }
+        .metric-value { margin-top: 8px; font-size: 18px; font-weight: 800; }
+
+        .turno-grid {
+            padding: 10px 18px 8px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .turno-box {
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 8px 6px;
+            text-align: center;
+        }
+
+        .turno-label { color: var(--muted); font-size: 11px; }
+        .turno-value { font-size: 19px; font-weight: 800; color: #0f2a4a; margin-top: 2px; }
+
+        .card-footer {
+            padding: 10px 14px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #475569;
+            font-size: 12px;
+        }
+
+        .wifi.online { color: var(--green); }
+        .wifi.offline { color: var(--red); }
+
+        @media (max-width: 860px) {
+            .app { grid-template-columns: 1fr; }
+            #sidebar { position: relative; }
+            #dashboard { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <aside id="sidebar">
+            <h2>Configurações</h2>
+
+            <div class="side-card">
+                <div class="side-title">Modo Amostra</div>
+                <label class="chk-item"><input type="checkbox" class="chk-maquina" data-maquina="JacGuard_09"> JacGuard_09</label>
+                <label class="chk-item"><input type="checkbox" class="chk-maquina" data-maquina="JacGuard_10"> JacGuard_10</label>
+                <label class="chk-item"><input type="checkbox" class="chk-maquina" data-maquina="JacGuard_11"> JacGuard_11</label>
+            </div>
+
+            <div class="side-card">
+                <div class="side-title">Conexão MQTT</div>
+                <div id="status">● Offline</div>
+            </div>
+        </aside>
+
+        <main id="main-content">
+            <div class="topbar">
+                <div>
+                    <h1>Monitoramento de Produção</h1>
+                    <div class="subtitle">Dashboard MQTT em tempo real para teste da máquina</div>
+                </div>
+
+                <div class="summary">
+                    <div class="summary-item">
+                        <div class="summary-label">Máquinas</div>
+                        <div class="summary-value" id="totalMachines">0</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">Online</div>
+                        <div class="summary-value" id="totalOnline">0</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">Offline</div>
+                        <div class="summary-value" id="totalOffline">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="dashboard">
+                <div class="empty-state" id="emptyState">Aguardando dados MQTT da máquina...</div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const MQTT_URL = 'ws://192.168.1.13:9001/mqtt';
+        const TOPICO_DADOS = 'esp32/mqtt/dados_json';
+        const TOPICO_HEARTBEAT = 'esp32/mqtt/heartbeat';
+        const TOPICO_TODOS = 'esp32/mqtt/#';
+        const OFFLINE_TIMEOUT_MS = 30000;
+
+        const client = mqtt.connect(MQTT_URL, {
+            reconnectPeriod: 3000,
+            connectTimeout: 8000,
+            clean: true
+        });
+
+        const statusTxt = document.getElementById('status');
+        const dashboard = document.getElementById('dashboard');
+        const emptyState = document.getElementById('emptyState');
+        const maquinas = {};
+
+        function valor(...opcoes) {
+            for (const item of opcoes) {
+                if (item !== undefined && item !== null && item !== '') return item;
+            }
+            return undefined;
+        }
+
+        function normalizarBool(v) {
+            return v === 1 || v === '1' || v === true || v === 'true';
+        }
+
+        function normalizarPayload(data) {
+            const machineStatus = data.machine_status || {};
+            const production = data.production || {};
+            const network = data.network || {};
+
+            return {
+                id: valor(data.device_id, data.ID_Máquina, data.ID_Maquina, 'Sem_ID'),
+                evento: valor(data.event, data.Evento, 'STATUS'),
+                dataHora: valor(data.timestamp, data.Data_Hora, data.data_hora, '---'),
+                mac: valor(data.MAC, data.mac, '---'),
+                ip: valor(network.ip, data.IP, data.ip, '---'),
+                sUrdimento: valor(machineStatus.entrada_1, data.S_Urdimento, 0),
+                sTrama: valor(machineStatus.entrada_2, data.S_trama, data.S_Trama, 0),
+                sEnrolamento: valor(machineStatus.entrada_3, data.S_Enrolamento_Fita, 0),
+                start: valor(machineStatus.start, data.BT_Start, 0),
+                stop: valor(machineStatus.stop, data.BT_Stop, 0),
+                manutencao: valor(machineStatus.manutencao, data.BT_Manutenção, data.BT_Manutencao, 0),
+                contA: Number(valor(production.turno_a, data.Cont_A, data.turno_a, 0)) || 0,
+                contB: Number(valor(production.turno_b, data.Cont_B, data.turno_b, 0)) || 0,
+                contC: Number(valor(production.turno_c, data.Cont_C, data.turno_c, 0)) || 0,
+                turnoAtual: valor(production.turno_atual, data.Turno_Atual, data.turno_atual, '-')
+            };
+        }
+
+        function cssId(id) {
+            return 'card-' + String(id).replace(/[^a-zA-Z0-9_-]/g, '-');
+        }
+
+        function carregarPreferenciasAmostra() {
+            document.querySelectorAll('.chk-maquina').forEach(checkbox => {
+                const saved = localStorage.getItem('amostra-' + checkbox.dataset.maquina);
+                checkbox.checked = saved === 'true';
+
+                checkbox.addEventListener('change', (e) => {
+                    localStorage.setItem('amostra-' + e.target.dataset.maquina, e.target.checked);
+                    const id = e.target.dataset.maquina;
+                    if (maquinas[id]?.lastData) renderizarCard(maquinas[id].lastData);
+                });
+            });
+        }
+
+        function maquinaEmAmostra(id) {
+            const checkbox = document.querySelector(`.chk-maquina[data-maquina="${id}"]`);
+            return checkbox ? checkbox.checked : false;
+        }
+
+        function estadoMaquina(d) {
+           
+            if (normalizarBool(d.manutencao)) return { classe: 'manutencao', texto: 'Manutenção' };
+            if (normalizarBool(d.start)) {
+                if (maquinaEmAmostra(d.id)) return { classe: 'amostra', texto: 'Amostra' };
+                return { classe: 'producao', texto: 'Produzindo' };
+            }
+            if (normalizarBool(d.stop)) return { classe: 'parada', texto: 'Em Stop' };
+            return { classe: 'parada', texto: 'Parada' };
+        }
+
+        function ledClasse(valor, tipo) {
+            const ativo = normalizarBool(valor);
+            if (!ativo) return 'gray';
+            if (tipo === 'erro') return 'red';
+            if (tipo === 'alerta') return 'yellow';
+            if (tipo === 'info') return 'blue';
+            return 'green';
+        }
+
+        function criarCardSeNaoExiste(id) {
+            if (emptyState) emptyState.style.display = 'none';
+
+            const domId = cssId(id);
+            let card = document.getElementById(domId);
+
+            if (!card) {
+                card = document.createElement('div');
+                card.id = domId;
+                card.className = 'machine-card';
+                dashboard.appendChild(card);
+            }
+
+            return card;
+        }
+
+        function formatarDataRodape(dataHora) {
+            if (!dataHora || dataHora === '---') return new Date().toLocaleString('pt-BR');
+            return String(dataHora);
+        }
+
+        function tempoDesde(ms) {
+            if (!ms) return '--';
+            const diff = Math.max(0, Date.now() - ms);
+            const s = Math.floor(diff / 1000);
+            if (s < 60) return `${s}s`;
+            const m = Math.floor(s / 60);
+            if (m < 60) return `${m}min`;
+            const h = Math.floor(m / 60);
+            return `${h}h`;
+        }
+
+        function renderizarCard(dataOriginal) {
+            const d = normalizarPayload(dataOriginal);
+            const card = criarCardSeNaoExiste(d.id);
+            const estado = estadoMaquina(d);
+            const online = maquinas[d.id]?.online !== false;
+            const classe = online ? estado.classe : 'offline';
+            const produzidoTotal = d.contA + d.contB + d.contC;
+            const statusTexto = online ? estado.texto : 'Offline';
+            const tempoAtualizado = maquinas[d.id]?.lastSeen ? tempoDesde(maquinas[d.id].lastSeen) : '--';
+
+            card.className = `machine-card ${classe} pulse`;
+            setTimeout(() => card.classList.remove('pulse'), 450);
+
+            card.innerHTML = `
+                <div class="card-top">
+                    <div class="machine-icon-wrap">◐</div>
+                    <div>
+                        <div class="machine-title">${d.id}</div>
+                        <div class="machine-time">⏱ ${tempoAtualizado}</div>
+                    </div>
+                </div>
+
+                <div class="info-list">
+                    <div class="info-row">
+                        <div class="row-icon">▣</div>
+                        <div class="row-label">Status</div>
+                        <div class="row-value">${statusTexto}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="row-icon">◈</div>
+                        <div class="row-label">Turno atual</div>
+                        <div class="row-value">${d.turnoAtual}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="row-icon">↯</div>
+                        <div class="row-label">Start</div>
+                        <div class="row-value">${d.start}<span class="led ${ledClasse(d.start, 'ok')}"></span></div>
+                    </div>
+                    <div class="info-row">
+                        <div class="row-icon">🔧</div>
+                        <div class="row-label">${normalizarBool(d.manutencao) ? 'Manutenção' : 'Outros'}</div>
+                        <div class="row-value">${d.manutencao}<span class="led ${ledClasse(d.manutencao, 'info')}"></span></div>
+                    </div>
+                </div>
+
+                <div class="time-strip">
+                    <span class="time-good">● ${normalizarBool(d.start) ? tempoAtualizado : '00:00:00'}</span>
+                    <span class="time-bad">● ${normalizarBool(d.stop) ? tempoAtualizado : '00:00:00'}</span>
+                </div>
+
+                <div class="main-metrics">
+                    <div class="gauge-wrap">
+                        <div class="gauge"></div>
+                        <div class="gauge-text"><strong>OEE</strong><br>0%</div>
+                    </div>
+                    <div class="metric-right">
+                        <div class="metric-label">Produzido</div>
+                        <div class="metric-value">${produzidoTotal}m</div>
+                    </div>
+                </div>
+
+                <div class="turno-grid">
+                    <div class="turno-box">
+                        <div class="turno-label">Turno A</div>
+                        <div class="turno-value">${d.contA}</div>
+                    </div>
+                    <div class="turno-box">
+                        <div class="turno-label">Turno B</div>
+                        <div class="turno-value">${d.contB}</div>
+                    </div>
+                    <div class="turno-box">
+                        <div class="turno-label">Turno C</div>
+                        <div class="turno-value">${d.contC}</div>
+                    </div>
+                </div>
+
+                <div class="card-footer">
+                    <span>↻ ${formatarDataRodape(d.dataHora)}</span>
+                    <span class="wifi ${online ? 'online' : 'offline'}">${online ? '≋' : '×'}</span>
+                </div>
+            `;
+        }
+
+        function atualizarResumo() {
+            const ids = Object.keys(maquinas);
+            const online = ids.filter(id => maquinas[id].online).length;
+            document.getElementById('totalMachines').innerText = ids.length;
+            document.getElementById('totalOnline').innerText = online;
+            document.getElementById('totalOffline').innerText = ids.length - online;
+        }
+
+        client.on('connect', () => {
+            // Assina todos os tópicos esp32/mqtt para evitar perder heartbeat/status se o firmware publicar em outro subtópico.
+            client.subscribe(TOPICO_TODOS);
+            statusTxt.innerText = '● Conectado';
+            statusTxt.classList.add('connected');
+        });
+
+        client.on('reconnect', () => {
+            statusTxt.innerText = '● Reconectando';
+            statusTxt.classList.remove('connected');
+        });
+
+        client.on('close', () => {
+            statusTxt.innerText = '● Offline';
+            statusTxt.classList.remove('connected');
+        });
+
+        client.on('error', (err) => {
+            console.error('Erro MQTT:', err);
+            statusTxt.innerText = '● Erro MQTT';
+            statusTxt.classList.remove('connected');
+        });
+
+        client.on('message', (topic, message) => {
+            try {
+                const data = JSON.parse(message.toString());
+                const d = normalizarPayload(data);
+
+                // Heartbeat compacto não traz todos os campos da máquina.
+                // Então, quando ele chegar, preservamos o último payload completo recebido.
+                const anterior = maquinas[d.id]?.lastData || {};
+                const isHeartbeat = topic === TOPICO_HEARTBEAT || d.evento === 'HEARTBEAT';
+                const payloadParaRender = isHeartbeat ? { ...anterior, ...data } : data;
+
+                maquinas[d.id] = {
+                    lastSeen: Date.now(),
+                    online: true,
+                    lastData: payloadParaRender,
+                    lastTopic: topic
+                };
+
+                renderizarCard(payloadParaRender);
+                atualizarResumo();
+            } catch (e) {
+                console.error('Erro no JSON:', e, message.toString());
+            }
+        });
+
+        setInterval(() => {
+            let mudou = false;
+
+            Object.keys(maquinas).forEach(id => {
+                if (Date.now() - maquinas[id].lastSeen > OFFLINE_TIMEOUT_MS) {
+                    if (maquinas[id].online !== false) {
+                        maquinas[id].online = false;
+                        mudou = true;
+                    }
+                }
+                if (maquinas[id].lastData) renderizarCard(maquinas[id].lastData);
+            });
+
+            if (mudou) atualizarResumo();
+        }, 3000);
+
+        carregarPreferenciasAmostra();
+    </script>
+</body>
+</html>

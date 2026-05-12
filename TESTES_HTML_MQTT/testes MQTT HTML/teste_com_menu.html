@@ -1,0 +1,172 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>ESP32 Dashboard Pro</title>
+    <script src="https://unpkg.com"></script>
+    <style>
+        /* Estrutura de Layout */
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background: #121212; 
+            color: white; 
+            margin: 0; 
+            display: flex; /* Cria o menu lateral e corpo lado a lado */
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Menu Lateral Estilo Iframe */
+        nav {
+            width: 250px;
+            background: #1a1a1a;
+            border-right: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            flex-shrink: 0;
+        }
+
+        nav h2 { color: #00ff88; font-size: 1.2em; margin-bottom: 30px; text-align: center; }
+
+        nav a {
+            color: #888;
+            text-decoration: none;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            transition: 0.3s;
+            border-left: 3px solid transparent;
+        }
+
+        nav a:hover { background: #333; color: white; border-left: 3px solid #00ff88; }
+
+        /* Área Principal de Conteúdo */
+        main {
+            flex-grow: 1;
+            padding: 40px;
+            overflow-y: auto; /* Permite scroll apenas no conteúdo */
+        }
+
+        /* Grid de Cards: 3 colunas */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr); /* 3 cards lado a lado */
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .card { 
+            background: #1e1e1e; 
+            padding: 25px; 
+            border-radius: 12px; 
+            border: 1px solid #333; 
+            text-align: center; 
+            position: relative; 
+            min-width: 0; /* Evita quebra de layout */
+        }
+
+        /* Estilização Interna */
+        .value-box { font-size: 2.2em; font-weight: bold; color: #00ff88; margin: 15px 0; }
+        .btn-group { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
+        button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .btn-on { background: #00ff88; color: #121212; }
+        .btn-off { background: #ff4d4d; color: white; }
+        button:hover { opacity: 0.8; transform: scale(1.05); }
+        .status { font-size: 0.7em; margin-bottom: 10px; color: #888; }
+        .online { color: #00ff88; }
+        
+        #feedback-img {
+            display: none;
+            width: 40px;
+            margin-top: 10px;
+            animation: fadeInOut 1.5s ease-in-out;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: scale(0.5); }
+            20% { opacity: 1; transform: scale(1.1); }
+            80% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- MENU LATERAL -->
+    <nav>
+        <h2>DASHBOARD</h2>
+        <a href="#">🏠 Início</a>
+        <a href="#">📊 Sensores</a>
+        <a href="#">⚙️ Configuração</a>
+        <a href="#">🛠️ Ferramentas</a>
+        <a href="#">🚪 Sair</a>
+    </nav>
+
+    <!-- CORPO PRINCIPAL -->
+    <main>
+        <div class="dashboard-grid">
+            <!-- 3 CARDS SUPERIORES -->
+            <div class="card">
+                <div id="status" class="status">● Desconectado</div>
+                <h2>Sensor 01</h2>
+                <div class="value-box" id="valor1">--</div>
+                <div class="msg-time" style="font-size: 0.7em; color: #666;">Aguardando...</div>
+            </div>
+
+            <div class="card">
+                <div class="status">● Desconectado</div>
+                <h2>Sensor 02</h2>
+                <div class="value-box" id="valor2">--</div>
+                <div class="msg-time" style="font-size: 0.7em; color: #666;">Aguardando...</div>
+            </div>
+
+            <div class="card">
+                <h3>Controle</h3>
+                <p style="font-size: 0.8em; color: #aaa;">esp32/comando</p>
+                <div class="btn-group">
+                    <button class="btn-on" onclick="enviarComando('LIGAR')">ON</button>
+                    <button class="btn-off" onclick="enviarComando('DESLIGAR')">OFF</button>
+                </div>
+                <center><img id="feedback-img" src="https://cdn-icons-png.flaticon.com" alt="OK"></center>
+            </div>
+
+            <!-- MAIS 6 CARDS ABAIXO -->
+            <!-- Usei a mesma classe para demonstrar o layout -->
+            <div class="card"><h4>Card 4</h4><div class="value-box">--</div></div>
+            <div class="card"><h4>Card 5</h4><div class="value-box">--</div></div>
+            <div class="card"><h4>Card 6</h4><div class="value-box">--</div></div>
+            <div class="card"><h4>Card 7</h4><div class="value-box">--</div></div>
+            <div class="card"><h4>Card 8</h4><div class="value-box">--</div></div>
+            <div class="card"><h4>Card 9</h4><div class="value-box">--</div></div>
+        </div>
+    </main>
+
+    <script>
+        // Substitua pelo seu IP real
+        const client = mqtt.connect('ws://192.168.1.13:9001/mqtt');
+        
+        client.on('connect', () => {
+            const statusElements = document.querySelectorAll('.status');
+            statusElements.forEach(el => el.innerHTML = '● <span class="online">Online</span>');
+            client.subscribe('esp32/teste');
+        });
+
+        client.on('message', (topic, message) => {
+            // Lógica de atualização (exemplo para o primeiro card)
+            document.getElementById('valor1').innerText = message.toString();
+        });
+
+        function enviarComando(cmd) {
+            const payload = JSON.stringify({ acao: cmd, timestamp: Date.now() });
+            client.publish('esp32/comando', payload);
+            
+            const img = document.getElementById('feedback-img');
+            img.style.display = 'block';
+            setTimeout(() => { img.style.display = 'none'; }, 1500);
+        }
+    </script>
+</body>
+</html>

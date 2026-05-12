@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>ESP32 MQTT Dashboard - Multi-Device</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; text-align: center; }
+        
+        /* Layout em Grid para os 3 cards */
+        .dashboard { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 20px; 
+            justify-content: center; 
+            margin-top: 30px; 
+        }
+
+        .card { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+            width: 280px; 
+            text-align: left; 
+            border-top: 5px solid #007bff;
+        }
+
+        .status-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .status-dot { height: 10px; width: 10px; background-color: #bbb; border-radius: 50%; display: inline-block; }
+        .online { background-color: #28a745; }
+
+        .data-item { 
+    margin: 5px 0; 
+    border-bottom: 1px solid #eee; 
+    padding-bottom: 5px;
+    display: flex;       /* Transforma em flexbox */
+    gap: 10px;           /* Controla a distância exata entre o nome e o valor */
+    justify-content: flex-start; /* Alinha tudo à esquerda */
+}
+        .label { font-weight: bold; color: #333; font-size: 0.9em; }
+        .value { color: #007bff; float: right; font-weight: bold; }
+        
+        h1 { color: #333; }
+        #broker-status { margin-bottom: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>Monitoramento de Dispositivos</h1>
+    <div id="broker-status">Conectando ao broker...</div>
+
+    <!-- Container onde os cards aparecerão -->
+    <div id="dashboard" class="dashboard">
+        <!-- Os cards serão injetados aqui via JavaScript -->
+    </div>
+
+    <script>
+        const brokerUrl = 'ws://192.168.1.13:9001/mqtt'; 
+        const topic = 'esp32/mqtt/#'; // O '#' faz o subscribe em todos os sub-tópicos
+
+        const client = mqtt.connect(brokerUrl);
+        const brokerStatus = document.getElementById('broker-status');
+        const dashboard = document.getElementById('dashboard');
+
+        // Objeto para armazenar as referências dos cards existentes
+        const devices = {};
+
+        client.on('connect', () => {
+            brokerStatus.innerText = '📡 Conectado ao Broker';
+            brokerStatus.style.color = 'green';
+            client.subscribe(topic);
+        });
+
+        client.on('message', (topic, message) => {
+            try {
+                const payload = JSON.parse(message.toString());
+                // Usamos o final do tópico como ID do dispositivo (ex: esp32/sensors/ESP01)
+                const deviceId = topic.split('/').pop(); 
+                
+                updateOrCreateCard(deviceId, payload);
+            } catch (e) {
+                console.error("Erro no JSON:", e);
+            }
+        });
+
+        function updateOrCreateCard(id, data) {
+            // Se o card do dispositivo ainda não existe, cria um novo
+            if (!devices[id]) {
+                const cardHtml = `
+                    <div class="card" id="card-${id}">
+                        <div class="status-header">
+                            <h3>ID: ${id}</h3>
+                            <span class="status-dot online"></span>
+                        </div>
+                        <div class="content" id="content-${id}">Carregando...</div>
+                    </div>`;
+                dashboard.insertAdjacentHTML('beforeend', cardHtml);
+                devices[id] = true;
+            }
+
+            // Atualiza os dados dentro do card
+            const container = document.getElementById(`content-${id}`);
+            let html = '';
+            for (const key in data) {
+                html += `
+                    <div class="data-item">
+                        <span class="label">${key.toUpperCase()}</span>
+                        <span class="value">${data[key]}</span>
+                    </div>`;
+            }
+            container.innerHTML = html;
+        }
+
+        client.on('error', (err) => {
+            brokerStatus.innerText = '❌ Erro na conexão';
+            brokerStatus.style.color = 'red';
+        });
+    </script>
+</body>
+</html>

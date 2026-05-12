@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <h1>Status MQTT: <span id="status">Desconectado</span></h1>
+  
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script>
+    // URL de conexão (use 'ws://' para conexões sem SSL)
+    const brokerUrl = 'ws://192.168.1.13:9001'; 
+    const options = { clientId: 'web_client_' + Math.random().toString(16).substr(2, 8) };
+
+    const client = mqtt.connect(brokerUrl, options);
+
+    client.on('connect', () => {
+      document.getElementById('status').innerText = 'Conectado!';
+      client.subscribe('meu/topico');
+      console.log('Inscrito no tópico!');
+    });
+
+    client.on('message', (topic, message) => {
+      console.log(`Mensagem recebida em ${topic}: ${message.toString()}`);
+    });
+
+    client.on('error', (err) => {
+      console.error('Erro de conexão:', err);
+    });
+  </script>
+</body>
+</html>

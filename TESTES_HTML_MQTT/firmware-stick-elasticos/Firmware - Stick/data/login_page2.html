@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coletor de dados IoT - Hub de Controle</title>
+    <link rel="icon" href="data:,">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.5/font/bootstrap-icons.min.css"
+        rel="stylesheet">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap');
+
+        body {
+            font-family: 'Open Sans', sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .container-up {
+            width: 100%;
+            height: 12%;
+            display: flex;
+            align-items: center;
+            padding-top: 0.3rem;
+            padding-left: 1.2rem;
+        }
+
+        .senai-image {
+            width: 6.25rem;
+            height: 3.125rem;
+        }
+
+        .senai-image img {
+            width: 100%;
+            height: 100%;
+        }
+
+        .container-down {
+            background: linear-gradient(115deg, #000428, #004e92);
+            height: 100vh;
+            font-family: 'Open Sans', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container-button {
+            display: flex;
+            height: 100%;
+            gap: 0.625rem;
+            align-items: center;
+        }
+
+
+        .container {
+            background: #ffffff;
+            backdrop-filter: blur(0.625rem);
+            border-radius: 0.938rem;
+            padding: 2.2rem;
+            box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.37);
+            max-width: 32rem;
+        }
+
+        .container-instituto-senai-image {
+            width: 120%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            height: 100%;
+        }
+
+        .instituto-senai-image {
+            width: 100%;
+        }
+
+        .instituto-senai-image img {
+            width: 100%;
+            height: 100%;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            color: #2049af;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 2.5rem;
+            font-family: 'Open Sans', sans-serif;
+        }
+
+        .hub-text {
+            color: #c90404;
+            font-size: 1.188rem;
+        }
+
+        label {
+            color: #ffffff;
+        }
+
+        .form-control {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            padding-left: 0.8rem;
+        }
+
+        .form-control:focus {
+            box-shadow: 0 0 0.425rem black;
+            box-shadow: none !important;
+        }
+
+        .input-group {
+            margin-bottom: 1.25rem;
+            height: 40%;
+        }
+
+        .input-group input {
+            width: 100%;
+            height: 50%;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 2.3%;
+            top: 18%;
+            color: #c90404;
+        }
+
+        .input-group-text {
+            padding-right: 1.469rem;
+            background-color: #ffffff;
+            border-right: none;
+        }
+
+        .btn-primary {
+            background-color: #0f7ea3;
+            border: none;
+            width: 100%;
+            margin-top: 0.375rem;
+            margin-bottom: 0.313rem;
+            font-size: 1rem;
+            transition: transform 0.2s;
+        }
+
+        .btn-primary:hover {
+            background-color: #00b4d8;
+            transform: translateY(-0.6px);
+        }
+
+        .background-animation span {
+            position: absolute;
+            display: block;
+            width: 1.2rem;
+            height: 1.2rem;
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 10px rgba(0, 224, 255, 0.5);
+            animation: animate 10s linear infinite;
+            border-radius: 50%;
+        }
+
+        @keyframes animate {
+            0% {
+                transform: translateY(0) rotate(0deg);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateY(-1000px) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        @media screen and (min-width: 768px) and (max-width: 1024px) {
+            .container {
+                width: 25rem;
+                height: 20.4rem;
+            }
+
+            .input-icon {
+                left: 3.3%;
+                top: 15%;
+            }
+
+            .container-instituto-senai-image {
+                width: 45rem;
+            }
+        }
+
+        @media screen and (min-width: 320px) and (max-width: 767px) {
+            h1 {
+                font-size: 1.3rem;
+            }
+
+            .container {
+                padding: 2rem;
+
+                width: 18rem;
+                height: 19rem;
+            }
+
+            .btn-primary {
+                font-size: 0.8rem;
+            }
+
+            .input-group-text {
+                padding-right: 1.1rem;
+            }
+
+            .input-group input {
+                font-size: 0.9rem;
+                padding-left: 0.5rem;
+            }
+
+            .input-icon {
+                left: 3.3%;
+                top: 15%;
+            }
+
+            .container-button {
+                display: flex;
+                gap: 0.4rem;
+            }
+
+            .container-instituto-senai-image {
+                width: 27rem;
+            }
+
+            .btn-primary {
+                margin-bottom: 0.7rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-up">
+        <div class="senai-image">
+            <img src="/data/senai-logo.png" alt="">
+        </div>
+    </div>
+
+    <div class="container-down">
+
+        <div class="background-animation">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+
+        <div class="container">
+            <h1 class="glow-effect">COLETOR DE DADOS
+                <div class="hub-text"> Hub de Controle </div>
+            </h1>
+
+            <form action="authentication" method="post">
+                <div class="input-group flex-nowrap">
+                    <span class="input-group-text"><i class="bi bi-person-circle input-icon"></i></span>
+                    <input type="text" class="form-control" placeholder="Usuário" aria-label="Usuário"
+                        aria-describedby="addon-wrapping">
+                </div>
+
+                <div class="input-group flex-nowrap">
+                    <span class="input-group-text"><i class="bi bi-lock-fill input-icon"></i></span>
+                    <input type="text" class="form-control" placeholder="Senha" aria-label="Username"
+                        aria-describedby="addon-wrapping">
+                </div>
+
+                <div class="container-button">
+                    <button type="submit" class="btn btn-primary">acessar</button>
+
+                    <div class="container-instituto-senai-image">
+                        <div class="instituto-senai-image">
+                            <img src="/data/instituto-senai.jpeg" alt="">
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,29 @@
+
+<html>
+<head>
+  <title> conexao MQTT teste </title>
+  <style>
+  body  { background-color: #282c34; color: white; text-align: center; font-family: Arial; padding-top: 30px;}
+  h1 { color: #61dafb; }
+  .button { padding: 15px 30px; font-size: 18px; margin: 10px; border: none; border-radius: 10px; cursor: pointer;}
+  .on { background-color: #4caf50; color: white; }
+  .off { background-color: #f4436; color: white; }
+  </style>
+    </head>
+	<body>
+	<h1> teste mqtt </h1>
+	< button class = "button on" onclic = "publishMessage('esp32/teste','ON')"> Ligar led </button>
+	< button class = "button off" onclic = "publishMessage('esp32/teste','OFF')"> Ligar led </button>
+	<script src="https://unpkg.com/mqtt/dist/mqtt.mim.js"></script>
+	<script>
+	    const client = mqtt = mqtt.conect('wss://192.168.1.13:1883');
+		client.on('connect', function () {
+		  console.log('conectado ao broker mqtt');
+		  });
+		  function publishMessage(topic, message) {
+		  client.publish(topic, message);
+		  console.log('Enviado:', topic, message);
+		  }
+		  </script>
+		  </body>
+		  </html>

@@ -1,0 +1,130 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard Multi-Dispositivos ESP32</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; padding: 40px; margin: 0; }
+        h1 { text-align: center; color: #00ff88; margin-bottom: 40px; }
+        
+        /* Container principal em Grid para os 3 cards */
+        .dashboard { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); 
+            gap: 20px; 
+            max-width: 1200px; 
+            margin: 0 auto; 
+        }
+
+        .card { background: #1e1e1e; padding: 25px; border-radius: 12px; border: 1px solid #333; text-align: center; transition: 0.3s; }
+        .card:hover { border-color: #00ff88; }
+        
+        .value-box { font-size: 2.5em; font-weight: bold; color: #00ff88; margin: 15px 0; }
+        
+        .btn-group { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
+        button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.3s; flex: 1; }
+        .btn-on { background: #00ff88; color: #121212; }
+        .btn-off { background: #ff4d4d; color: white; }
+        button:hover { opacity: 0.8; transform: scale(1.02); }
+        
+        .status { font-size: 0.8em; margin-bottom: 10px; color: #888; }
+        .online { color: #00ff88; }
+        .device-id { font-size: 0.7em; background: #333; padding: 3px 8px; border-radius: 4px; margin-bottom: 10px; display: inline-block; }
+    </style>
+</head>
+<body>
+
+    <h1>Controle e Monitoramento ESP32</h1>
+
+    <div class="dashboard">
+        <!-- Dispositivo 1 -->
+        <div class="card" id="dev-1">
+            <div class="status">● Desconectado</div>
+            <div class="device-id">Tópico: esp32/1</div>
+            <h2>Esp32-1</h2>
+            <div class="value-box" id="valor-1">--</div>
+            <div class="btn-group">
+                <button class="btn-on" onclick="enviarComando('1', 'LIGAR')">LIGAR</button>
+                <button class="btn-off" onclick="enviarComando('1', 'DESLIGAR')">DESLIGAR</button>
+            </div>
+        </div>
+
+        <!-- Dispositivo 2 -->
+        <div class="card" id="dev-2">
+            <div class="status">● Desconectado</div>
+            <div class="device-id">Tópico: esp32/2</div>
+            <h2>Esp32-2</h2>
+            <div class="value-box" id="valor-2">--</div>
+            <div class="btn-group">
+                <button class="btn-on" onclick="enviarComando('2', 'LIGAR')">LIGAR</button>
+                <button class="btn-off" onclick="enviarComando('2', 'DESLIGAR')">DESLIGAR</button>
+            </div>
+        </div>
+
+        <!-- Dispositivo 3 -->
+        <div class="card" id="dev-3">
+            <div class="status">● Desconectado</div>
+            <div class="device-id">Tópico: esp32/3</div>
+            <h2>Esp32-3</h2>
+            <div class="value-box" id="valor-3">--</div>
+            <div class="btn-group">
+                <button class="btn-on" onclick="enviarComando('3', 'LIGAR')">LIGAR</button>
+                <button class="btn-off" onclick="enviarComando('3', 'DESLIGAR')">DESLIGAR</button>
+            </div>
+        </div>
+		<!-- Dispositivo 3 -->
+        <div class="card" id="dev-4">
+            <div class="status">● Desconectado</div>
+            <div class="device-id">Tópico: esp32/4</div>
+            <h2>Esp32-4</h2>
+            <div class="value-box" id="valor-4">--</div>
+            <div class="btn-group">
+                <button class="btn-on" onclick="enviarComando('4', 'LIGAR')">LIGAR</button>
+                <button class="btn-off" onclick="enviarComando('4', 'DESLIGAR')">DESLIGAR</button>
+            </div>
+        </div>
+		
+    </div>
+
+    <script>
+        // Configuração do Broker (Ajuste para o seu IP)
+        const client = mqtt.connect('ws://192.168.1.13:9001/mqtt');
+
+        client.on('connect', () => {
+            console.log("Conectado ao Broker");
+            // Inscreve nos tópicos de dados dos 3 dispositivos usando wildcard (+)
+            client.subscribe('esp32/+/dados');
+            
+            // Atualiza visualmente o status geral (opcional)
+            document.querySelectorAll('.status').forEach(s => s.innerHTML = '● <span class="online">Broker Online</span>');
+        });
+
+        // Recebe dados e identifica qual card atualizar
+        client.on('message', (topic, message) => {
+            // Exemplo de tópico: esp32/1/dados
+            const partes = topic.split('/');
+            const id = partes[1]; // Pega o "1", "2" ou "3"
+            
+            const valorElemento = document.getElementById(`valor-${id}`);
+            if (valorElemento) {
+                try {
+                    const data = JSON.parse(message.toString());
+                    valorElemento.innerText = data.valor || message.toString();
+                } catch(e) { 
+                    valorElemento.innerText = message.toString(); 
+                }
+            }
+        });
+
+        // Envia comando para um dispositivo específico
+        function enviarComando(id, cmd) {
+            const topicoComando = `esp32/${id}/comando`;
+            const payload = JSON.stringify({ acao: cmd, timestamp: Date.now() });
+            client.publish(topicoComando, payload);
+            console.log(`Comando para ESP ${id}:`, payload);
+        }
+    </script>
+</body>
+</html>

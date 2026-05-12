@@ -1,0 +1,7 @@
+
+Sobre a pinagem do esp32 
+
+
+
+As GPIOs 6 a 11 (conectados à flash integrada). Não usar pinos de boot (0, 2, 12, 15).
+Entrada Apenas:  GPIOs 34 a 39 são apenas entrada (não têm pull-up interno).

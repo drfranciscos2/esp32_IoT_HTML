@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>ESP32 controle e Monitoramento</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; display: flex; flex-direction: column; align-items: center; padding: 40px; }
+        .card { background: #1e1e1e; padding: 25px; border-radius: 12px; border: 1px solid #333; width: 350px; text-align: center; margin-bottom: 20px; position: relative; }
+        .value-box { font-size: 2.5em; font-weight: bold; color: #00ff88; margin: 15px 0; }
+        
+        .btn-group { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
+        button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .btn-on { background: #00ff88; color: #121212; }
+        .btn-off { background: #ff4d4d; color: white; }
+        button:hover { opacity: 0.8; transform: scale(1.05); }
+        
+        .status { font-size: 0.8em; margin-bottom: 15px; color: #888; }
+        .online { color: #00ff88; }
+
+        /* Estilo da imagem de confirmação */
+        #feedback-img {
+            display: none;
+            width: 50px;
+            margin-top: 15px;
+            animation: fadeInOut 1.5s ease-in-out;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: scale(0.5); }
+            20% { opacity: 1; transform: scale(1.1); }
+            80% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Monitoramento -->
+    <div class="card">
+        <div id="status" class="status">Desconectado</div>
+        <h2>Sensor ESP32</h2>
+        <div class="value-box" id="valor">--</div>
+        <div id="msg-time" style="font-size: 0.8em; color: #666;">Aguardando dados...</div>
+    </div>
+	 <div class="card">
+        <div id="status" class="status">Desconectado</div>
+        <h2>Sensor ESP32</h2>
+        <div class="value-box" id="valor">--</div>
+        <div id="msg-time" style="font-size: 0.8em; color: #666;">Aguardando dados...</div>
+    </div>
+
+    <!-- Controle -->
+    <div class="card">
+        <h3>Comandos</h3>
+        <p style="font-size: 0.9em; color: #aaa;">Tópico: esp32/comando</p>
+        <div class="btn-group">
+            <button class="btn-on" onclick="enviarComando('ON')">LIGAR</button>
+            <button class="btn-off" onclick="enviarComando('OFF')">DESLIGAR</button>
+        </div>
+        
+        <!-- Imagem de confirmação -->
+        <center>
+            <img id="feedback-img" src="imagem.png" alt="Enviado">
+        </center>
+    </div>
+
+    <script>
+        const client = mqtt.connect('ws://192.168.1.13:9001/mqtt');
+        const topicoDados = 'esp32/mqtt/dados_json';
+        const topicoComando = 'esp32/mqtt/cmd';
+
+        client.on('connect', () => {
+            document.getElementById('status').innerHTML = '● <span class="online">Online</span>';
+            client.subscribe(topicoDados);
+        });
+
+        client.on('message', (topic, message) => {
+            if(topic === topicoDados) {
+                try {
+                    const data = JSON.parse(message.toString());
+                    document.getElementById('valor').innerText = data.valor || message.toString();
+                    document.getElementById('msg-time').innerText = "Atualizado às: " + new Date().toLocaleTimeString();
+                } catch(e) { 
+                    document.getElementById('valor').innerText = message.toString(); 
+                }
+            }
+        });
+
+        function enviarComando(cmd) {
+            const payload = JSON.stringify({ acao: cmd, timestamp: Date.now() });
+            client.publish(topicoComando, payload);
+            console.log("Comando enviado:", payload);
+
+            // Lógica para mostrar a imagem e esconder após 1.5 segundos
+            const img = document.getElementById('feedback-img');
+            img.style.display = 'block';
+            
+            setTimeout(() => {
+                img.style.display = 'none';
+            }, 1500);
+        }
+    </script>
+</body>
+</html

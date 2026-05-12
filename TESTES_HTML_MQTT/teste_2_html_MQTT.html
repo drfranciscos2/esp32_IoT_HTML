@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 MQTT Local Monitor</title>
+    <!-- Carregando a biblioteca Paho MQTT via CDN -->
+    <script src="https://cdnjs.cloudflare.com"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #f4f4f4; }
+        .container { margin-top: 50px; }
+        .card { background: white; padding: 20px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1 { color: #333; }
+        #data { font-size: 3em; color: #007bff; margin: 20px 0; }
+        #status { font-size: 0.9em; color: gray; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>Monitor ESP32</h1>
+            <div id="status">Conectando...</div>
+            <div id="data">---</div>
+            <p>Tópico: <span id="topic">esp32/dados</span></p>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURAÇÕES DO SEU BROKER LOCAL
+        const brokerIP = "192.168.1.13"; // <-- MUDAR PARA O IP DO MOSQUITTO
+        const port = 9001;               // Porta WebSocket
+        const topic = "esp32/mqtt/dados_json";
+
+        // Gera um ID de cliente único
+        const clientId = "web_client_" + Math.random().toString(16).substring(2, 8);
+        
+        // Cria o cliente MQTT
+        const client = new Paho.MQTT.Client(brokerIP, port, clientId);
+
+        // Funções de callback
+        client.onConnectionLost = onConnectionLost;
+        client.onMessageArrived = onMessageArrived;
+
+        // Conecta ao broker
+        client.connect({ onSuccess: onConnect, onFailure: onFailure });
+
+        function onConnect() {
+            document.getElementById("status").innerHTML = "Conectado a " + brokerIP;
+            document.getElementById("status").style.color = "green";
+            console.log("Conectado");
+            client.subscribe(topic);
+        }
+
+        function onFailure(message) {
+            document.getElementById("status").innerHTML = "Falha: " + message.errorMessage;
+            document.getElementById("status").style.color = "red";
+        }
+
+        function onConnectionLost(responseObject) {
+            if (responseObject.errorCode !== 0) {
+                document.getElementById("status").innerHTML = "Conexão Perdida";
+                console.log("onConnectionLost:" + responseObject.errorMessage);
+            }
+        }
+
+        function onMessageArrived(message) {
+            console.log("Nova Mensagem:" + message.payloadString);
+            document.getElementById("data").innerHTML = message.payloadString;
+        }
+    </script>
+</body>
+</html>

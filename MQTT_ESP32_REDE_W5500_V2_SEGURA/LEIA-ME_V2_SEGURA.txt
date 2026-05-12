@@ -1,0 +1,27 @@
+MQTT_ESP32_REDE_W5500_V2_SEGURA
+
+Objetivo desta versão:
+- Estabilizar o firmware antes de alterar o frontend.
+- Manter compatibilidade com o dashboard HTML atual.
+
+Principais alterações:
+1. Removido o bloqueio no boot quando o cabo de rede estiver desconectado.
+2. Callback MQTT habilitado com comandos: PING, STATUS e RESET_CONTADORES.
+3. Fila simples em RAM para eventos ocorridos enquanto MQTT estiver offline.
+4. Publicação periódica não entra na fila offline para não lotar memória.
+5. JSON agora possui campos novos padronizados e também mantém os campos antigos.
+6. Escrita na flash foi reduzida: salva por intervalo ou por quantidade de incrementos.
+7. Reset diário passa a usar data completa no formato YYYYMMDD.
+8. Eventos foram renomeados para nomes funcionais: START_PRESSIONADO, URDIMENTO_ATIVO etc.
+
+Atenção:
+- A fila offline é em RAM. Se faltar energia, eventos ainda não reenviados serão perdidos.
+- MAC, IP e device_id continuam fixos. Antes de usar em várias placas, tornar esses valores únicos por equipamento.
+- Testar primeiro em bancada com Serial Monitor e MQTT Explorer.
+
+Teste sugerido:
+1. Subir o firmware com cabo conectado e verificar publicação PERIODICO.
+2. Desconectar o broker ou cabo, acionar entradas e observar mensagens [FILA].
+3. Reconectar e verificar reenviou eventos pendentes.
+4. Gerar incrementos e verificar se a flash não salva a cada pulso.
+5. Enviar comandos no tópico esp32/mqtt/cmd: PING, STATUS e RESET_CONTADORES.

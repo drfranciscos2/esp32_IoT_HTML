@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        .container {
+            display: grid;
+            /* Cria 3 colunas de tamanhos iguais */
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 20px; /* Espaço entre os cards */
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background-color: #f4f4f9;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            font-family: sans-serif;
+        }
+
+        /* Destaque visual para os 3 primeiros */
+        .card:nth-child(-1n+3) {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
+
+        /* Responsividade: em telas menores que 768px, vira 1 coluna */
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Os 3 cards do topo -->
+    <div class="card">Card Topo 1</div>
+    <div class="card">Card Topo 2</div>
+    <div class="card">Card Topo 3</div>
+
+    <!-- Os 6 cards de baixo -->
+    <div class="card">Card Abaixo 4</div>
+    <div class="card">Card Abaixo 5</div>
+    <div class="card">Card Abaixo 6</div>
+    <div class="card">Card Abaixo 7</div>
+    <div class="card">Card Abaixo 8</div>
+    <div class="card">Card Abaixo 9</div>
+</div>
+
+</body>
+</html

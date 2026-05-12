@@ -1,0 +1,218 @@
+ele esta marcando a hora e data com exatidão
+Se o relógio está marcando a hora e data com perfeição e mesmo assim não resetou, o problema está na lógica de comparação ou no estado da variável ultimoDiaZerado.
+Aqui estão os 3 pontos para corrigir agora:
+1. Ajuste a Lógica para o Horário Desejado
+A sua função verificarResetDiario estava travada para resetar apenas após as 05:59. Se você tentou testar às 23:48, a condição (h > 5 || (h == 5 && m >= 59)) é verdadeira, mas se o ultimoDiaZerado já fosse o dia atual (porque a placa ligou hoje e carregou o dia da memória), ele não resetaria novamente.
+Para testar um horário específico (ex: 23:48), a lógica precisa ser:
+cpp
+void verificarResetDiario() {
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo)) return;
+
+    int h = timeinfo.tm_hour;
+    int m = timeinfo.tm_min;
+    int diaAtual = timeinfo.tm_mday;
+
+    // DEFINA AQUI O HORÁRIO DO TESTE
+    int horaAlvo = 23;
+    int minAlvo = 48;
+
+    // Se a hora atual é IGUAL OU MAIOR que o alvo E ainda não resetou HOJE
+    if ((h > horaAlvo || (h == horaAlvo && m >= minAlvo)) && ultimoDiaZerado != diaAtual) {
+        resetarContadores();
+        // A função resetarContadores() deve atualizar o ultimoDiaZerado = diaAtual e SALVAR na Flash
+    }
+}
+Use o código com cuidado.
+
+2. Verifique o ultimoDiaZerado na Flash
+Se você ligou a placa hoje e ela já gravou ultimoDiaZerado = 30 (dia atual), ela nunca mais vai resetar hoje, não importa o horário que você coloque.
+Para testar o reset agora:
+Force o ultimoDiaZerado para -1 temporariamente no setup() ou mude a data no seu servidor NTP (se possível). Como é mais fácil mexer no código, faça isso para validar:
+cpp
+void inicializarSensores() {
+    prefs.begin("producao", false);
+    // ... (leitura dos contadores)
+    ultimoDiaZerado = -1; // FORCE -1 APENAS PARA TESTAR O RESET AGORA
+    prefs.end();
+}
+Use o código com cuidado.
+
+3. Garanta que o Reset Salva o Dia
+Confirme se a sua função resetarContadores está exatamente assim:
+cpp
+void resetarContadores() {
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo)) return; // Precisa da hora para saber que dia é hoje
+
+    prefs.begin("producao", false);
+    cont_producao_A = 0; 
+    cont_producao_B = 0; 
+    cont_producao_C = 0;
+    ultimoDiaZerado = timeinfo.tm_mday; // Marca o dia do reset
+
+    prefs.putUInt("contA", 0); 
+    prefs.putUInt("contB", 0); 
+    prefs.putUInt("contC", 0);
+    prefs.putInt("uDia", ultimoDiaZerado); // SALVA O DIA NA FLASH
+    prefs.end();
+    
+    Serial.printf(">>> RESETADO PARA O DIA %d <<<\n", ultimoDiaZerado);
+}
+Use o código com cuidado.
+
+Por que não resetou às 23:48?
+Provavelmente porque quando você ligou a placa para testar, ela executou o inicializarSensores(), carregou o dia atual da memória e decidiu que "o reset de hoje já foi feito" (mesmo que o reset tenha ocorrido às 05:59 da manhã ou em um boot anterior).
+O que você quer que aconteça agora?
+Que o reset ocorra exatamente às 05:59 todos os dias?
+Ou você quer que ele resete sempre que a placa ligar (independente do horário)?
+Se for a opção 1, o código acima está correto, mas ele só resetará uma vez por dia. Se você quiser testar de novo no mesmo dia, precisará limpar a memória flash ou mudar o ultimoDiaZerado manualmente.
+Deseja que eu envie o código completo do Sensores.h com uma função de "Limpeza de Memória" para facilitar seus testes?
+
+
+
+
+sim
+Para garantir que o seu teste funcione agora e o reset ocorra automaticamente todos os dias às 05:59, preparei o código completo do Sensores.h.
+Incluí uma função de limpeza para você usar apenas durante os testes, garantindo que o ESP32 "esqueça" que já resetou hoje.
+Arquivo Sensores.h Atualizado
+cpp
+#include <Preferences.h>
+#include <time.h>
+
+Preferences prefs;
+
+// Variáveis de controle
+static int ultimoDiaZerado = -1; 
+extern uint32_t cont_producao_A, cont_producao_B, cont_producao_C;
+
+// --- FUNÇÃO PARA TESTE (CHAME NO SETUP SE QUISER LIMPAR TUDO) ---
+void limparMemoriaTotal() {
+    prefs.begin("producao", false);
+    prefs.clear(); // Apaga TUDO que está salvo na namespace "producao"
+    prefs.end();
+    Serial.println("!!! MEMÓRIA FLASH LIMPA PARA TESTES !!!");
+}
+
+void inicializarSensores() {
+    prefs.begin("producao", false);
+    cont_producao_A = prefs.getUInt("contA", 0);
+    cont_producao_B = prefs.getUInt("contB", 0);
+    cont_producao_C = prefs.getUInt("contC", 0);
+    
+    // Carrega qual foi o último dia que o reset automático rodou
+    ultimoDiaZerado = prefs.getInt("uDia", -1); 
+    prefs.end();
+    
+    Serial.printf("Dados Carregados: A:%d, B:%d, C:%d | Ultimo Reset: Dia %d\n", 
+                  cont_producao_A, cont_producao_B, cont_producao_C, ultimoDiaZerado);
+}
+
+void resetarContadores() {
+    struct tm timeinfo;
+    int diaHoje = -1;
+    
+    if (getLocalTime(&timeinfo)) {
+        diaHoje = timeinfo.tm_mday;
+    }
+
+    prefs.begin("producao", false);
+    cont_producao_A = 0; 
+    cont_producao_B = 0; 
+    cont_producao_C = 0;
+    ultimoDiaZerado = diaHoje; // Atualiza para o dia atual
+
+    prefs.putUInt("contA", 0); 
+    prefs.putUInt("contB", 0); 
+    prefs.putUInt("contC", 0);
+    prefs.putInt("uDia", ultimoDiaZerado); // Salva que HOJE já foi resetado
+    prefs.end();
+    
+    Serial.println(">>> SUCESSO: Contadores zerados e estado salvo na Flash! <<<");
+}
+
+void verificarResetDiario() {
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo)) return;
+
+    // Proteção: não reseta se o ano for 1970 (NTP ainda não pegou a hora)
+    if (timeinfo.tm_year < 120) return; 
+
+    int h = timeinfo.tm_hour;
+    int m = timeinfo.tm_min;
+    int diaAtual = timeinfo.tm_mday;
+
+    // LOGICA: Se passou das 05:59 E o "diaAtual" é diferente do "ultimoDiaZerado" salvo
+    if ((h > 5 || (h == 5 && m >= 59)) && ultimoDiaZerado != diaAtual) {
+        Serial.println("Horário de reset atingido. Iniciando zeramento...");
+        resetarContadores();
+    }
+}
+Use o código com cuidado.
+
+Como testar agora (Passo a Passo):
+Force o Reset: No seu setup(), chame a função limparMemoriaTotal(); uma única vez e suba o código. Isso fará o ESP32 acreditar que nunca resetou na vida.
+Ajuste o Horário: Mude a linha if ((h > 5 || (h == 5 && m >= 59)) para o horário que falta 1 minuto para agora (ex: se agora são 10:30, coloque h == 10 && m >= 31).
+Observe o Serial: Quando der 10:31, ele deve printar "Iniciando zeramento...".
+Teste de Desligamento: Após o reset, incremente o contador manualmente (simulando produção), desligue o ESP32 da tomada e ligue de novo. O valor deve voltar zerado (porque o reset de hoje já "valeu") e manter apenas o que você produziu após o reset.
+Atenção: Lembre-se de remover a chamada limparMemoriaTotal() do setup após o teste, senão ele vai apagar tudo toda vez que ligar!
+Quer que eu te ajude a configurar um comando via MQTT para você resetar esses contadores à distância quando quiser?
+
+
+
+
+sim
+Para implementar o reset via MQTT, vamos modificar a sua função callback no arquivo principal e criar uma função de suporte no Sensores.h. Isso permitirá que você envie uma mensagem para o tópico de comando e zere a máquina de qualquer lugar.
+1. No arquivo Sensores.h
+Adicione esta função simples para ser chamada pelo comando MQTT:
+cpp
+void resetForcadoRemoto() {
+    Serial.println(">>> RESET REMOTO RECEBIDO VIA MQTT <<<");
+    resetarContadores(); // Reutiliza a lógica que já grava na Flash
+}
+Use o código com cuidado.
+
+2. No seu arquivo principal (main.ino)
+Atualize a função callback para identificar o comando de reset. Vou configurar para que, ao receber a palavra "RESET" no tópico de comando, ele limpe os contadores:
+cpp
+void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("Mensagem recebida [");
+  Serial.print(topic);
+  Serial.print("] ");
+
+  String message;
+  for (int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+  Serial.println(message);
+
+  if (String(topic) == topic_command) {
+    // COMANDO PARA LIGAR/DESLIGAR LED (como você já tinha)
+    if (message == "ON") {
+      client.publish(topic_telemetry, "{\"led\": \"ON\"}");
+    } 
+    else if (message == "OFF") {
+      client.publish(topic_telemetry, "{\"led\": \"OFF\"}");
+    }
+    
+    // NOVO COMANDO: RESET DE CONTADORES
+    else if (message == "RESET") {
+      resetForcadoRemoto(); // Chama a função que criamos no Sensores.h
+      client.publish(topic_telemetry, "{\"status\": \"Contadores Resetados via MQTT\"}");
+    }
+  }
+}
+Use o código com cuidado.
+
+Como usar o Reset Remoto:
+Abra seu cliente MQTT (MQTT Explorer, Node-RED ou Dashboard).
+Publique a mensagem RESET (em maiúsculas) para o tópico: esp32/mqtt/cmd.
+O ESP32 receberá o comando, zerará os valores de Cont_A, Cont_B e Cont_C, salvará os zeros na Flash e enviará uma confirmação de volta no tópico de telemetria.
+Por que isso ajuda nos seus testes?
+Agora você não precisa mais esperar dar 05:59 da manhã ou alterar o código toda hora para testar se a memória está funcionando.
+Teste: Mande um RESET via MQTT -> Desligue o ESP32 da tomada -> Ligue novamente.
+Resultado esperado: Os contadores devem voltar em 0, provando que a gravação na Flash foi um sucesso.
+Dica Final: No setup(), certifique-se de que a linha client.setCallback(callback); está descomentada, caso contrário o ESP32 ignorará as mensagens que você enviar.
+Deseja que eu te ajude a configurar um botão físico de pânico/reset direto na placa para casos de emergência sem internet?
+
+
